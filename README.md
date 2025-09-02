@@ -18,13 +18,21 @@ The main user input is a set of three _touch sensors_, which measure the capacit
 
 We will begin by building and testing the oscillator. The oscillator repeatedly charges and discharges a capacitor to find out how much electrical charge it can store when a voltage is applied. This quantity, charge per unit voltage, is the _capacitance_, measured in _Farads_. The capacitance in this case is a combination of an electronic component and the capacitance of the user's finger ($C$). The capacitance of a finger is very small and it is best measured in _picofarads_ - trillionths of a Farad. The circuit diagram for the oscillator looks like this:
 
-![Water pump](osc-cct.png)
+![Circuit Diagram for the oscillator](osc-cct.png)
 
-The active component in the oscillator is an inverter, which measures the input voltage as above or below a certain threshold and sets the output to the logical opposite. If the voltage is below the threshold, the output is set to a high value (3.3V in this case), and if the input exceeds the threshold the output voltage is low: 0V.
+The active component in the oscillator is an inverter, which measures the input voltage as above or below a certain threshold and sets the output to the logical opposite. If the voltage is below the threshold, the output is set to a high value (3.3V in this case), and if the input exceeds the threshold the output voltage is low: 0V. The output of the inverter is the output of the oscillator ($V_1$).
 
-Imagine the capacitors C3 and C4 hold no charge ($q$) at first, so the voltage across its terminals is zero. That means the input to the inverter is below the threshold and so the inverter output is set high to 3.3V. Now the resistor R2 comes into action - it connects the inverter output to the capacitor, so current begins to flow into the capacitor, charging it. The magnitude of the current ($i$) is given by the voltage across the resistor terminals divided by the resistance, so at first we have $i = 3.3 \text{V} / 270k\Omega = 12\mu \text{A}$ (1 microamp is 1 millionth of an amp). The current flowing into the capacitor is accumulated as a stored charge, which means the voltage of the capacitor increases according to $V_\text{C} = q/C = 1/C \int i dt$.
+$V_1$ is also connected to a capacitor $C$ and resistor $R$ in series such as $V_1 = V_\text{C} + V_\text{R}$, where $V_\text{C}$ and $V_\text{R}$ are the voltages between the terminals of the capacitor and resistor respectively. The capacitor consists of two elements: a 47pF chip capacitor and the capacitance of the user's finger touching the pads. 
 
-After some time, enough charge accumulates in the capacitor so that its voltage exceeds the threshold voltage of the inverter, which around the midpoint of the logical high and low voltages: 1.65V. When this happens, the output of the inverter will switch to 0V and now we have a capacitor charged to 1.65V connected via the resistor to 0V. So the capacitor charging current reverses and becomes a discharging current, causing the capacitor voltage to decrease again. Of course, once the voltage drops below the threshold the inverter will switch again and so the process will continue indefinitely, with the capacitor voltage wavering around the threshold voltage and the inverter output toggling between high and low. This is the purpose of an oscillator, to produce a signal that varies, repetitively, over time.
+$V_\text{C}$ is connected to the inverter input, so if $V_\text{C}$ is low $V_1$ will be high and a current flows into the capacitor charging it. When $V_\text{C}$ rises above the threshold of the inverter, $V_1$ will be low and the capacitor will discharge again. Of course, once the voltage drops below the threshold the inverter will switch again and so the process will continue indefinitely, with the capacitor voltage wavering around the threshold voltage and the inverter output toggling between high and low. This is the purpose of an oscillator, to produce a signal that varies, repetitively, over time.
+
+![Current flowing around the circuit, charging the capacitor]()
+
+$V_\text{C}$ can be expressed in terms of the charge $Q$ stored in the capacitor: $V_\text{C} = \frac{Q}{C}$. $V_\text{R}$ is related to the current $I$ flowing through the resistor: $V_\text{R} = IR$. Furthermore, since the same current flows through the resistor and capacitor, $I$ can be expressed as the rate of change of capacitor charge, giving $V_\text{R} = R\frac{dQ}{dt}$. Combining everything gives the differential equation $V_1 = R\frac{dQ}{dt} + \frac{Q}{C}$
+
+Solving the differential equation gives $Q = Ae^{-\frac{1}{RC}t}+CV_1$, and applying $Q = CV_\text{C}$ gives 
+
+$V_\text{C} = Be^{-\frac{1}{RC}t}+V_1$
 
 ### Building the Oscillator
 
@@ -36,19 +44,15 @@ Connect an oscilloscope probe to the proble point for oscillator output 0 on the
 
 ### Oscillator Frequency
 
-The exact relationship between capacitance and oscillator frequency is complicated by two factors.
+Earlier we derived an equation for expressing the capacitor voltage as a function of time and we can use this to find how long the capacitor will take to charge and discharge. First, we need to consider another element: hysteresis. We have established that the capacitor voltage varies slightly above and below the inverter threshold voltage, but by how much? If all the components behaved perfectly and the inverter could detect an infinitesimal difference between input and threshold, the oscillator would switch at an unlimited frequency.
 
-First, the magnitude of the charging and discharging current is not a constant. The current is directly proportional to the potential difference across the resistor, but as the capacitor charges, this potential difference reduces in magnitude. Including the capacitor voltage in the current calculation gives
+In fact, the inverter has a special type of input called a _schmitt trigger_, and it's designed for this scenario where you want to deliberately desensitise the input a little. It works by introducing a dependency between the threshold voltage and the output voltage. If the output is high, the threshold voltage is reduced slightly and if it's low, the threshold is increased.
 
-$i = \frac{V_\text{out} - V_\text{C}}{R}$
+So there are two threshold voltages $V_{\text{t}-}$ and $V_{\text{t}+}$, and the capacitor voltage will oscillate between them. The difference between them is called the hysteresis and the larger the hysteresis, the lower the frequency of oscillation. For the inverter in our circuit, the lower threshold $V_\text{t-}$ is around 1.5V and the upper threshold $V_\text{t+}$ is around 2.15V.
 
-We also have, from earlier, $V_\text{C} = 1/C \int i dt$ so
+Consider the capacitor charging from $V_{\text{t}-}$ to $V_{\text{t}+}$. At time $t=0$, $V_\text{C} = V_{\text{t}-} = 1.5\text{V}$ and $V_1 = 3.3\text{V}$. Using these initial conditions in the earlier equation gives $V_\text{C} = -1.8e^{-\frac{1}{RC}t}+3.3$. The capacitor charges until $V_\text{C} = 2.15V$, and rearranging gives $t_\text{charge}=0.45RC$. $V_{\text{t}-}$ and $V_{\text{t}+}$ are not quite symmetrically spaced within the range of $V_1$, so analysing separately for the discharging time gives $t_\text{discharge}=0.36RC$.
 
-$V_\text{C} = \int{\frac{V_\text{out} - V_\text{C}}{RC} dt}$ - a differential equation.
-
-The second complication is _hysteresis_. We have established that the capacitor voltage varies slightly above and below the inverter threshold voltage, but by how much? If all the components behaved perfectly and the inverter could detect an infinitesimal difference between input and threshold, the oscillator would switch at an unlimited frequency.
-
-In fact, the inverter has a special type of input called a _schmitt trigger_, and it's designed for this scenario where you want to deliberately desensitise the input a little. It works by introducing a dependency between the threshold voltage and the output voltage. If the output is high, the threshold voltage is reduced slightly and if it's low, the threshold is increased. So there are two threshold voltages and the capacitor voltage will oscillate between them. The difference between them is called the hysteresis and the larger the hysteresis, the lower the frequency of oscillation.
+Adding them together gives a total period of $0.81RC$ and an oscillator frequency of $f=\frac{1}{0.81RC}$. Using values from the circuit and ignoring the touch pad capacitance we have $R=270\text{k}\Omega$, $C=47\text{pF}$ and $f=97.3\text{kHz}$. The capacitance of a finger on the touch pad is quite variable, but if we assume an additional 30pF then the frequency drops to around 60kHz
 
 ## The Charge Pump
 
